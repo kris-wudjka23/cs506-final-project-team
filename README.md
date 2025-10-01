@@ -12,7 +12,7 @@ Predict the binary result if MBTA will delay or not based factors we consider.
 Study the relationships between delay and different factors.
 
 ## Data Collection
-Scraping data from [https://api-v3.mbta.com/](https://api-v3.mbta.com/) and other data wesbisites, collecting data related to weather, destinations, schedules, routes ...
+Scraping arrival/departure data from [https://api-v3.mbta.com/](https://api-v3.mbta.com/), [https://mbta-massdot.opendata.arcgis.com/](https://mbta-massdot.opendata.arcgis.com/), and other data wesbisites for collecting weather,such as [https://dev.meteostat.net/bulk/normals.html#endpoint](https://dev.meteostat.net/bulk/normals.html#endpoint), destinations, schedules, routes data which may potentially affect the arrival/departure time.
 
 ## Modeling Method 
 ### Logistic Regression   
@@ -26,6 +26,7 @@ Comprehensively predict the binary result. It's comprehensive and not sensitive 
 
 ### Deep Learning
 It's good at dealing with complicated non-linear problems. It predicts very accurately, but it needs sufficient data set to support it.
+
 ...
 
 ## Visualization
