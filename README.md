@@ -18,6 +18,8 @@ Scraping arrival/departure data from [https://api-v3.mbta.com/](https://api-v3.m
 ### Logistic Regression   
 It's a baseline. Logistic regression is to help us determine the binary result. The advantage is that it's straightforward, common, and easy to implement. In addition, it doesn't need parameter tunning. The downside is that its prediction accuracy may be low.
 
+**Current performance (bus_weather dataset, 1-minute delay label):** Accuracy 0.65 on the test split with ROC-AUC 0.69, showing moderate separation between delayed and on-time trips. The model achieves 0.72 precision and 0.65 recall for the delayed class, so it captures most true delays while keeping false alarms manageable, but it still misses about one-third of actual delays. These results make logistic regression a useful, interpretable baseline, yet they leave noticeable headroom for more expressive models or additional features.
+
 ### Decision Tree
 Output the binary result of delaying or not through feature splitting. It is good at telling what's the key factors are, and it can handle non-linear relationships. The disadvantages are that it's sensitive to noise.
 
