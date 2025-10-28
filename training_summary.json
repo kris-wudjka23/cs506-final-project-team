@@ -1,0 +1,35 @@
+{
+  "rows_total": 46405028,
+  "rows_train": 22907882,
+  "rows_test": 23497146,
+  "class_balance_train_binary": {
+    "0": 0.6733069429989207,
+    "1": 0.32669305700107937
+  },
+  "class_balance_test_binary": {
+    "0": 0.6558391814903819,
+    "1": 0.34416081850961816
+  },
+  "params": {
+    "tol_sec": 300.0,
+    "n_estimators": 200,
+    "max_depth": 14,
+    "min_samples_leaf": 25,
+    "random_state": 42,
+    "top_stops": 300,
+    "test_batch": 20000,
+    "max_features": "log2",
+    "max_samples": 0.3
+  },
+  "encoder": "OrdinalEncoder",
+  "fit_minutes": 30.69,
+  "metrics": {
+    "roc_auc": 0.6478102223243518,
+    "pr_auc": 0.4646362296127648
+  },
+  "cache": {
+    "used": true,
+    "path": "/Users/tz/Desktop/BU/cs506/cs506-final-project-team/artifacts/cache",
+    "format": "parquet_if_available_else_pickle"
+  }
+}
