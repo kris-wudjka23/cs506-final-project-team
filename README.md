@@ -66,7 +66,7 @@ MBTA buses are a primary commute option for Boston-area students. Chronic delays
 ---
 
 ## Visualization Gallery
-Our notebooks and scripts save plots to either `outputs/` or `outputs/logistic_notebook/figures/`. Highlights include:
+Our notebooks and scripts save plots to either `outputs/` (RF CLI) or `outputs/logistic_notebook/figures/` (notebook). Highlights include:
 
 | Visualization | File | Description |
 | --- | --- | --- |
@@ -76,12 +76,15 @@ Our notebooks and scripts save plots to either `outputs/` or `outputs/logistic_n
 | Route-level delay ranking | `.../route_delay_share.png` | Top 15 routes by delay percentage; cross-reference with MBTA planning priorities. |
 | Weather boxplots | `outputs/boxplot_air_temp_c.png`, etc. | Four-panel view of temperature, precipitation, wind speed, and cloud cover distributions split by on-time vs delayed. |
 | Precipitation vs. probability | `.../precip_vs_delay.png` | Bucketized precip intensity vs. delay rate + mean delay. |
-| ROC curve (logistic) | `outputs/logistic_regression_analysis/figures/roc_curve.png` (or `outputs/roc_curve.png`) | AUC ≈0.69 for logistic baseline sample. |
+| ROC curve (logistic) | `outputs/logistic_notebook/figures/roc_curve.png` | AUC reflects the sampled logistic baseline. |
 | PR curve (logistic) | `.../pr_curve.png` | Shows class imbalance challenge—precision drops when chasing higher recall. |
 | Calibration plot | `.../calibration_curve.png` | Logistic outputs are well-calibrated near mid-range probabilities but drift at extremes. |
 | Confusion matrices | `outputs/confusion_matrix.png` (RF), `.../confusion_matrix.png` (logistic) | Visualize trade-offs between false negatives vs false positives. |
 | Feature importance / coefficients | `feature_importance.csv`, `.../logistic_coefficients.png` | Contrasts tree-based importance with linear coefficient magnitudes. |
 | Random-forest feature importance plot | `feature_importance.csv` + optional plotting | Top drivers: hour, precipitation, route_id. |
+| Composite weather boxplots | `outputs/logistic_notebook/figures/weather_boxplots.png` | Consolidated panel comparing four weather attributes simultaneously. |
+| Slice metrics (hour) | `.../slice_metrics_hour.png` | Binned precision/recall by hour-of-day for easy threshold setting. |
+| Slice metrics (precip) | `.../slice_metrics_precip.png` | Binned precipitation intensity vs. logistic performance metrics. |
 
 All figures are saved as PNGs for immediate inclusion in slides or reports.
 
@@ -89,19 +92,21 @@ All figures are saved as PNGs for immediate inclusion in slides or reports.
 
 ## Modeling Results
 ### Logistic Regression Baseline
-Source: `logistic_regression_analysis.ipynb` (sampled 1M rows, 50% subsample for memory).
+Source: `logistic_regression_analysis.ipynb`. The repo snapshot does **not** include `bus_weather_clean.csv`, so the notebook currently auto-generates `outputs/logistic_notebook/demo_bus_weather_clean.csv` (50k synthetic rows) and trains on the cached 25k-row sample noted in the notebook logs. Update `CONFIG["csv_path"]` once the full dataset is available to regenerate real-world metrics/plots.
 
-| Metric | Value |
+| Metric | Value (demo sample) |
 | --- | --- |
-| Accuracy | 0.649 |
-| ROC-AUC | 0.692 |
-| Average Precision | 0.52 (varies with sample) |
-| Brier Score | ~0.205 |
-| Precision (Delayed) | 0.722 |
-| Recall (Delayed) | 0.648 |
-| Confusion Matrix | `[[3254, 1746], [2465, 4535]]` for the 12k-row test slice |
+| Accuracy | 0.8056 |
+| ROC-AUC | 0.7559 |
+| Average Precision | 0.2525 |
+| Brier Score | 0.1403 |
+| Precision (Delayed) | 0.2210 |
+| Recall (Delayed) | 0.5256 |
+| Confusion Matrix | `[[9456, 1921], [492, 545]]` on the 12,414-row 2024 test split |
 
-**Interpretation:** The balanced logistic model captures most delayed trips while keeping probability outputs interpretable and relatively well-calibrated. Temporal (hour/weekday) and precipitation signals dominate coefficients, but categorical encodings for route and weather condition also contribute.
+Positive rate in this sample is 8.35% delayed (5-minute threshold). Refresh `outputs/logistic_notebook/logistic_regression_metrics.json` after pointing the notebook at `bus_weather_clean.csv`.
+
+**Interpretation:** Even on the lightweight demo data, the calibrated logistic pipeline keeps probability outputs reliable and highlights temporal + precipitation signals, but class imbalance suppresses precision. Expect metrics to shift once the full dataset is reconnected.
 
 ### Random Forest Classifier
 Source: `train_rf_bus.py` (full-year training, chronological split; examples in `metrics.txt` and `training_summary.json`).
@@ -116,7 +121,7 @@ Source: `train_rf_bus.py` (full-year training, chronological split; examples in 
 | Training time | ~30.7 minutes on 20M-row subsample |
 | Feature importance leaders | hour, precipitation, route_id, wind speed, cloud cover |
 
-**Interpretation:** The tree-based model uncovers non-linear interactions, achieving similar ROC-AUC but higher recall at the cost of precision due to class imbalance. The caching system (`outputs/cache/processed.parquet`) avoids repetitive preprocessing when rerunning experiments.
+**Interpretation:** The tree-based model uncovers non-linear interactions, achieving similar ROC-AUC but higher recall at the cost of precision due to class imbalance. All CLI artifacts land under the `--out_dir` you choose (README examples use `--out_dir outputs`); the processed-data cache sits inside `<out_dir>/cache/processed.parquet`, so adjust references accordingly if you keep the default `artifacts/` folder.
 
 ---
 
@@ -142,11 +147,12 @@ pip install -r requirements_RF.txt
 ```bash
 python train_rf_bus.py --csv bus_weather_clean.csv --out_dir outputs --n_estimators 200 --max_depth 14 --max_samples 0.3 --top_stops 300
 ```
-Artifacts saved to `outputs/`:
+Artifacts saved to the directory passed via `--out_dir` (e.g., `outputs/`):
 - `metrics.txt` – classification report + ROC/PR AUC.
 - `confusion_matrix.png` – annotated heatmap.
 - `feature_importance.csv` – sorted list for additional plotting.
 - `training_summary.json` – dataset sizes, parameter settings, cache location, runtime.
+- `cache/processed.parquet` – cached, feature-engineered table reused across runs.
 
 ---
 
