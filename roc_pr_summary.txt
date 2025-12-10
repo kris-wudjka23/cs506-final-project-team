@@ -1,3 +1,4 @@
+=== Metrics (from metrics.txt) ===
 === VALIDATION (train-only model) ===
               precision    recall  f1-score   support
 
@@ -21,3 +22,9 @@ PR-AUC: 0.5870
 weighted avg     0.6548    0.6278    0.6358  23384354
 ROC-AUC: 0.6668
 PR-AUC: 0.4857
+
+=== Summary JSON ===
+Validation ROC-AUC: 0.7228204610223691
+Validation PR-AUC:  0.5870198706959822
+Test ROC-AUC:       0.6667697580263959
+Test PR-AUC:        0.48572362254017154

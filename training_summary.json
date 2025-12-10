@@ -1,18 +1,29 @@
 {
-  "rows_total": 46405028,
-  "rows_train": 22907882,
-  "rows_test": 23497146,
+  "rows_total": 46246931,
+  "rows_train": 17052388,
+  "rows_val": 5810189,
+  "rows_train_val": 22862577,
+  "rows_test": 23384354,
+  "rows_filtered_invalid_delay": 0,
   "class_balance_train_binary": {
-    "0": 0.6733069429989207,
-    "1": 0.32669305700107937
+    "0": 0.6814527677883003,
+    "1": 0.3185472322116996
+  },
+  "class_balance_val_binary": {
+    "0": 0.6480068032210312,
+    "1": 0.3519931967789688
+  },
+  "class_balance_train_val_binary": {
+    "0": 0.6729529658883161,
+    "1": 0.3270470341116839
   },
   "class_balance_test_binary": {
-    "0": 0.6558391814903819,
-    "1": 0.34416081850961816
+    "0": 0.6548443459246298,
+    "1": 0.34515565407537024
   },
   "params": {
     "tol_sec": 300.0,
-    "n_estimators": 200,
+    "n_estimators": 100,
     "max_depth": 14,
     "min_samples_leaf": 25,
     "random_state": 42,
@@ -21,11 +32,18 @@
     "max_features": "log2",
     "max_samples": 0.3
   },
-  "encoder": "OrdinalEncoder",
-  "fit_minutes": 30.69,
+  "encoder": "TargetEncoder(route_id, stop_id) + OrdinalEncoder(others)",
+  "fit_minutes_stage1": 2.85,
+  "fit_minutes_stage2": 13.15,
   "metrics": {
-    "roc_auc": 0.6478102223243518,
-    "pr_auc": 0.4646362296127648
+    "validation": {
+      "roc_auc": 0.7228204610223691,
+      "pr_auc": 0.5870198706959822
+    },
+    "test": {
+      "roc_auc": 0.6667697580263959,
+      "pr_auc": 0.48572362254017154
+    }
   },
   "cache": {
     "used": true,
