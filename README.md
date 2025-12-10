@@ -14,7 +14,7 @@ Welcome to the documentation for our CS506 final project. This README consolidat
 ---
 
 ## Build & Run (Reproducibility First)
-[![CI](https://github.com/yinzhou/cs506-final-project-team/actions/workflows/ci.yml/badge.svg)](https://github.com/yinzhou/cs506-final-project-team/actions/workflows/ci.yml)
+[![CI](https://github.com/kris-wudjka23/cs506-final-project-team/actions/workflows/ci.yml/badge.svg)](https://github.com/kris-wudjka23/cs506-final-project-team/actions/workflows/ci.yml)
 
 1. **Prerequisites**
    - Python 3.11+ and `pip`.
@@ -56,7 +56,7 @@ Welcome to the documentation for our CS506 final project. This README consolidat
    python predict_rf.py --model artifacts/model.joblib --input my_hourly_features.csv --output preds_rf.csv
    ```
 
-All artifacts referenced in this README live under `outputs/logistic_regression/`, `outputs/gradient_descent/`, and `artifacts/` after running the commands above.
+All artifacts referenced in this README live under the committed `outputs/` snapshots (including `outputs/logistic_notebook/` and `outputs/gradient_descent_notebook/`) or the RF trainer's `artifacts/` directory after running the commands above.
 
 ---
 
@@ -117,21 +117,21 @@ Our notebooks and scripts save plots to either `outputs/` (RF CLI) or `outputs/l
 
 | Visualization | File | Description |
 | --- | --- | --- |
-| Delay histogram by class | `outputs/logistic_notebook/figures/delay_histogram.png` | Shows heavy tail beyond 10 minutes, with delayed label capturing long right tail. |
-| Hourly delay profile | `.../hourly_profile.png` | Bar/line overlay reveals AM and PM rush-hour spikes in both mean delay and delay rate. |
-| Service-date vs. hour heatmap | `.../delay_heatmap.png` | Last 21 days of the sample with patchy hotspots indicating days with systemic issues. |
-| Route-level delay ranking | `.../route_delay_share.png` | Top 15 routes by delay percentage; cross-reference with MBTA planning priorities. |
-| Weather boxplots | `outputs/boxplot_air_temp_c.png`, etc. | Four-panel view of temperature, precipitation, wind speed, and cloud cover distributions split by on-time vs delayed. |
-| Precipitation vs. probability | `.../precip_vs_delay.png` | Bucketized precip intensity vs. delay rate + mean delay. |
-| ROC curve (logistic) | `outputs/logistic_notebook/figures/roc_curve.png` | AUC reflects the sampled logistic baseline. |
-| PR curve (logistic) | `.../pr_curve.png` | Shows class imbalance challenge—precision drops when chasing higher recall. |
-| Calibration plot | `.../calibration_curve.png` | Logistic outputs are well-calibrated near mid-range probabilities but drift at extremes. |
-| Confusion matrices | `outputs/confusion_matrix.png` (RF), `.../confusion_matrix.png` (logistic) | Visualize trade-offs between false negatives vs false positives. |
-| Feature importance / coefficients | `feature_importance.csv`, `.../logistic_coefficients.png` | Contrasts tree-based importance with linear coefficient magnitudes. |
-| Random-forest feature importance plot | `feature_importance.csv` + optional plotting | Top drivers: hour, precipitation, route_id. |
-| Composite weather boxplots | `outputs/logistic_notebook/figures/weather_boxplots.png` | Consolidated panel comparing four weather attributes simultaneously. |
-| Slice metrics (hour) | `.../slice_metrics_hour.png` | Binned precision/recall by hour-of-day for easy threshold setting. |
-| Slice metrics (precip) | `.../slice_metrics_precip.png` | Binned precipitation intensity vs. logistic performance metrics. |
+| Delay histogram by class | [`outputs/logistic_notebook/figures/delay_histogram.png`](outputs/logistic_notebook/figures/delay_histogram.png) | Shows heavy tail beyond 10 minutes, with delayed label capturing long right tail. |
+| Hourly delay profile | [`outputs/logistic_notebook/figures/hourly_profile.png`](outputs/logistic_notebook/figures/hourly_profile.png) | Bar/line overlay reveals AM and PM rush-hour spikes in both mean delay and delay rate. |
+| Service-date vs. hour heatmap | [`outputs/logistic_notebook/figures/delay_heatmap.png`](outputs/logistic_notebook/figures/delay_heatmap.png) | Last 21 days of the sample with patchy hotspots indicating days with systemic issues. |
+| Route-level delay ranking | [`outputs/logistic_notebook/figures/route_delay_share.png`](outputs/logistic_notebook/figures/route_delay_share.png) | Top 15 routes by delay percentage; cross-reference with MBTA planning priorities. |
+| Weather boxplots | [`boxplot_air_temp_c.png`](outputs/boxplot_air_temp_c.png), [`boxplot_precip_mm.png`](outputs/boxplot_precip_mm.png), [`boxplot_wind_speed_kmh.png`](outputs/boxplot_wind_speed_kmh.png), [`boxplot_cloud_cover.png`](outputs/boxplot_cloud_cover.png) | Four-panel view of temperature, precipitation, wind speed, and cloud cover distributions split by on-time vs delayed. |
+| Precipitation vs. probability | [`outputs/logistic_notebook/figures/precip_vs_delay.png`](outputs/logistic_notebook/figures/precip_vs_delay.png) | Bucketized precip intensity vs. delay rate + mean delay. |
+| ROC curve (logistic) | [`outputs/logistic_notebook/figures/roc_curve.png`](outputs/logistic_notebook/figures/roc_curve.png) | AUC reflects the sampled logistic baseline. |
+| PR curve (logistic) | [outputs/logistic_notebook/figures/pr_curve.png](outputs/logistic_notebook/figures/pr_curve.png) | Shows class imbalance challenge--precision drops when chasing higher recall. |
+| Calibration plot | [`outputs/logistic_notebook/figures/calibration_curve.png`](outputs/logistic_notebook/figures/calibration_curve.png) | Logistic outputs are well-calibrated near mid-range probabilities but drift at extremes. |
+| Confusion matrices | [`confusion_matrix.png`](confusion_matrix.png) (RF), [`outputs/logistic_notebook/figures/confusion_matrix.png`](outputs/logistic_notebook/figures/confusion_matrix.png) (logistic) | Visualize trade-offs between false negatives vs false positives. |
+| Feature importance / coefficients | [`feature_importance.csv`](feature_importance.csv), [`outputs/logistic_notebook/figures/logistic_coefficients.png`](outputs/logistic_notebook/figures/logistic_coefficients.png) | Contrasts tree-based importance with linear coefficient magnitudes. |
+| Random-forest feature importance plot | [`feature_importance.csv`](feature_importance.csv) + optional plotting | Top drivers: hour, precipitation, route_id. |
+| Composite weather boxplots | [`outputs/logistic_notebook/figures/weather_boxplots.png`](outputs/logistic_notebook/figures/weather_boxplots.png) | Consolidated panel comparing four weather attributes simultaneously. |
+| Slice metrics (hour) | [`outputs/logistic_notebook/figures/slice_metrics_hour.png`](outputs/logistic_notebook/figures/slice_metrics_hour.png) | Binned precision/recall by hour-of-day for easy threshold setting. |
+| Slice metrics (precip) | [`outputs/logistic_notebook/figures/slice_metrics_precip.png`](outputs/logistic_notebook/figures/slice_metrics_precip.png) | Binned precipitation intensity vs. logistic performance metrics. |
 
 All figures are saved as PNGs for immediate inclusion in slides or reports.
 
@@ -141,16 +141,16 @@ All figures are saved as PNGs for immediate inclusion in slides or reports.
 ### Logistic Regression Baseline
 
 **Visualizations**  
-- Static PNGs: running `logistic_regression_pipeline.py` drops a full gallery into `outputs/logistic_regression/`:  
-  - `boxplot_air_temp_c.png`, `boxplot_precip_mm.png`, `boxplot_wind_speed_kmh.png`, `boxplot_cloud_cover.png` for delayed vs. on-time weather distributions.  
-  - `heatmap_delay_by_date_hour.png` to highlight service-date/hour hotspots for the last 21 days in the sample.  
-  - `validation_roc_curve.png`, `validation_pr_curve.png`, `test_roc_curve.png`, `test_pr_curve.png` for split-by-split lift.  
-  - `calibration_curve.png` plus `slice_metrics_hour.png` and `slice_metrics_precip_mm.png` to sanity-check probability quality and fairness slices.  
-  - `logistic_coefficients.png` surfaces top 20 positive/negative drivers; pair these with the RF feature importances for interpretability discussions.  
+- Static PNGs: running `logistic_regression_pipeline.py` drops a full gallery into `outputs/logistic_regression/` (sample assets are checked into `outputs/` and `outputs/logistic_notebook/figures/`):  
+  - [`boxplot_air_temp_c.png`](outputs/boxplot_air_temp_c.png), [`boxplot_precip_mm.png`](outputs/boxplot_precip_mm.png), [`boxplot_wind_speed_kmh.png`](outputs/boxplot_wind_speed_kmh.png), [`boxplot_cloud_cover.png`](outputs/boxplot_cloud_cover.png) capture delayed vs. on-time weather distributions.  
+  - [`heatmap_delay_by_date_hour.png`](outputs/heatmap_delay_by_date_hour.png) highlights service-date/hour hotspots for the last 21 days in the sample.  
+  - [`roc_curve.png`](outputs/logistic_notebook/figures/roc_curve.png) and [`pr_curve.png`](outputs/logistic_notebook/figures/pr_curve.png) summarize lift (the CLI also writes validation/test variants when you rerun it locally).  
+  - [`calibration_curve.png`](outputs/logistic_notebook/figures/calibration_curve.png) plus [`slice_metrics_hour.png`](outputs/logistic_notebook/figures/slice_metrics_hour.png) and [`slice_metrics_precip.png`](outputs/logistic_notebook/figures/slice_metrics_precip.png) sanity-check probability quality and fairness slices.  
+  - [`logistic_coefficients.png`](outputs/logistic_notebook/figures/logistic_coefficients.png) surfaces top 20 positive/negative drivers; pair these with the RF feature importances for interpretability discussions.  
 - Interactive notebook: `logistic_regression_analysis.ipynb` keeps Altair/Plotly tabs for histograms, hourly sliders, precipitation drill-downs, and route-level charts so you can explore before exporting PNGs.  
-- (Optional) Embed PNGs directly into slide decks: copy `outputs/logistic_regression/heatmap_delay_by_date_hour.png` and `outputs/logistic_regression/logistic_coefficients.png` for narrative-ready visuals.
+- (Optional) Embed PNGs directly into slide decks: copy `outputs/heatmap_delay_by_date_hour.png` and `outputs/logistic_notebook/figures/logistic_coefficients.png` for narrative-ready visuals.
 
-![Logistic Heatmap](outputs/logistic_regression/heatmap_delay_by_date_hour.png) ![Logistic Coefficients](outputs/logistic_regression/logistic_coefficients.png)
+![Logistic Heatmap](outputs/heatmap_delay_by_date_hour.png) ![Logistic Coefficients](outputs/logistic_notebook/figures/logistic_coefficients.png)
 
 **Processing & Modeling**  
 - The CLI pulls rows from the shared Parquet cache built in `outputs/cache/`, guaranteeing identical filtering, wind-direction encodings, and calendar features as the RF trainer.  
@@ -168,7 +168,7 @@ python logistic_regression_pipeline.py \
   --delay-threshold 1.0
 ```
 
-`logistic_regression_metrics.json` captures validation + 2024 test accuracy, ROC-AUC, average precision, Brier score, confusion matrices, and class reports. The PNGs listed above—especially ROC/PR and calibration—let you confirm you hit the delay-prediction goal before moving on to downstream scoring.
+[`logistic_regression_metrics.json`](outputs/logistic_regression_metrics.json) captures validation + 2024 test accuracy, ROC-AUC, average precision, Brier score, confusion matrices, and class reports. The PNGs listed above—especially ROC/PR and calibration—let you confirm you hit the delay-prediction goal before moving on to downstream scoring.
 
 ### Gradient-Descent Logistic Baseline
 Source: `gradient_descent_pipeline.py` + `gradient_descent_classifier.py`. This CLI mirrors the logistic flow but swaps in a custom full-batch gradient-descent solver with configurable learning rate, regularization, and iteration cap. Artifacts land in `outputs/gradient_descent/`:
@@ -206,9 +206,9 @@ Source: `train_rf_bus.py` (chronological split; train Jan–Sep 2023, val Oct–
 **Interpretation:** After label filtering and target encoding, precision improved with a modest recall trade-off; overall PR-AUC and ROC-AUC rose versus the earlier baseline. Artifacts land under `--out_dir` (e.g., `artifacts/`): `metrics.txt`, `confusion_matrix.png`, `feature_importance.csv`, `training_summary.json`, `model.joblib`, and `cache/processed.parquet`. See `README_rf.md` for RF-specific quickstart and inference.
 
 ### Visualizations (RF)
-- Confusion matrices: `artifacts/confusion_matrix.png` (test), `confusion_matrix_val.png` (validation).
-- Feature importances: `artifacts/feature_importance.csv` + `feature_importance.png` (run `python visualize_rf.py --out_dir artifacts`).
-- Metric summaries: `artifacts/metrics.txt` and `artifacts/roc_pr_summary.txt` (via `visualize_rf.py`).
+- Confusion matrices: [`confusion_matrix.png`](confusion_matrix.png) captures the test split (rerun `visualize_rf.py` locally for additional slices).
+- Feature importances: [`feature_importance.csv`](feature_importance.csv) + `feature_importance.png` (regenerate via `python visualize_rf.py --out_dir artifacts`).
+- Metric summaries: [`metrics.txt`](metrics.txt) and [`training_summary.json`](training_summary.json) detail dataset sizes plus ROC/PR values.
 
 ---
 
@@ -239,9 +239,9 @@ Metrics below reflect the latest demo run (50k synthetic sample) while the real 
 
 | Model | ROC-AUC (test) | PR-AUC (test) | Accuracy (test) | Artifacts |
 | --- | --- | --- | --- | --- |
-| Logistic regression | 0.756 | 0.253 | 0.806 | [logistic_regression_metrics.json](outputs/logistic_regression/logistic_regression_metrics.json), [heatmap](outputs/logistic_regression/heatmap_delay_by_date_hour.png), [coefficients](outputs/logistic_regression/logistic_coefficients.png) |
-| Gradient-descent logistic | 0.754 | 0.249 | 0.803 | [gradient_descent_metrics.json](outputs/gradient_descent/gradient_descent_metrics.json), [ROC/PR](outputs/gradient_descent/test_roc_curve.png), [coefficients](outputs/gradient_descent/gradient_descent_coefficients.png) |
-| Random forest | 0.667 | 0.486 | 0.628 | [metrics.txt](artifacts/metrics.txt), [confusion matrix](artifacts/confusion_matrix.png), [feature_importance.csv](artifacts/feature_importance.csv) |
+| Logistic regression | 0.756 | 0.253 | 0.806 | [logistic_regression_metrics.json](outputs/logistic_regression_metrics.json), [heatmap](outputs/heatmap_delay_by_date_hour.png), [coefficients](outputs/logistic_notebook/figures/logistic_coefficients.png) |
+| Gradient-descent logistic | 0.754 | 0.249 | 0.803 | [gradient_descent_metrics.json](outputs/gradient_descent_notebook/gradient_descent_metrics.json), [ROC/PR](outputs/gradient_descent_notebook/figures/roc_curve.png), [coefficients](outputs/gradient_descent_notebook/figures/gradient_descent_coefficients.png) |
+| Random forest | 0.667 | 0.486 | 0.628 | [metrics.txt](metrics.txt), [confusion matrix](confusion_matrix.png), [feature_importance.csv](feature_importance.csv) |
 
 All three models exceed the operational baseline (chance ROC-AUC ≈ 0.5) and surface actionable visuals (calibration curves, feature importances) that meet the project goal of explaining and predicting MBTA bus delays.
 
