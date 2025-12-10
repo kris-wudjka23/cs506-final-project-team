@@ -109,29 +109,29 @@ Positive rate in this sample is 8.35% delayed (5-minute threshold). Refresh `out
 **Interpretation:** Even on the lightweight demo data, the calibrated logistic pipeline keeps probability outputs reliable and highlights temporal + precipitation signals, but class imbalance suppresses precision. Expect metrics to shift once the full dataset is reconnected.
 
 ### Random Forest Classifier
-Source: `train_rf_bus.py` (full-year training, chronological split; examples in `metrics.txt` and `training_summary.json`).
+Source: `train_rf_bus.py` (chronological split; train Jan–Sep 2023, val Oct–Dec 2023, test 2024). Uses target encoding for `route_id`/`stop_id`, ordinal for other cats, label filtering, and a cached Parquet to speed reruns.
 
-| Metric | Value |
+| Metric (latest run) | Value |
 | --- | --- |
-| Accuracy | 0.6025 |
-| Recall (Delayed) | 0.6277 |
-| Precision (Delayed) | 0.4451 |
-| ROC-AUC | 0.6478 |
-| PR-AUC | 0.4646 |
-| Training time | ~30.7 minutes on 20M-row subsample |
-| Feature importance leaders | hour, precipitation, route_id, wind speed, cloud cover |
+| Accuracy (test) | 0.6278 |
+| Recall (Delayed, test) | 0.5988 |
+| Precision (Delayed, test) | 0.4693 |
+| ROC-AUC (test) | 0.6668 |
+| PR-AUC (test) | 0.4857 |
+| Validation PR-AUC | 0.5870 |
+| Training time | ~16 minutes total (train-only fit ~2.9 min + train+val fit ~13.1 min) |
+| Feature importance leaders | time_point_order, hour, route_id, point_type, day_of_year, stop_id |
 
-**Interpretation:** The tree-based model uncovers non-linear interactions, achieving similar ROC-AUC but higher recall at the cost of precision due to class imbalance. All CLI artifacts land under the `--out_dir` you choose (README examples use `--out_dir outputs`); the processed-data cache sits inside `<out_dir>/cache/processed.parquet`, so adjust references accordingly if you keep the default `artifacts/` folder.
+**Interpretation:** After label filtering and target encoding, precision improved with a modest recall trade-off; overall PR-AUC and ROC-AUC rose versus the earlier baseline. Artifacts land under `--out_dir` (e.g., `artifacts/`): `metrics.txt`, `confusion_matrix.png`, `feature_importance.csv`, `training_summary.json`, `model.joblib`, and `cache/processed.parquet`. See `README_rf.md` for RF-specific quickstart and inference.
+
+### Visualizations (RF)
+- Confusion matrices: `artifacts/confusion_matrix.png` (test), `confusion_matrix_val.png` (validation).
+- Feature importances: `artifacts/feature_importance.csv` + `feature_importance.png` (run `python visualize_rf.py --out_dir artifacts`).
+- Metric summaries: `artifacts/metrics.txt` and `artifacts/roc_pr_summary.txt` (via `visualize_rf.py`).
 
 ---
 
 ## Reproducing Results
-### Prerequisites
-```bash
-python -m venv .venv
-.venv\\Scripts\\activate
-pip install -r requirements_RF.txt
-```
 
 ### Generate Integrated Dataset
 1. Download monthly MBTA CSVs and Meteostat weather files into `data/`.

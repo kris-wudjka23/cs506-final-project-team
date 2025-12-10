@@ -1,0 +1,40 @@
+.DEFAULT_GOAL := help
+
+PYTHON ?= python3
+CSV ?= mbta_bus.csv
+OUT ?= artifacts
+N_ESTIMATORS ?= 100
+MAX_DEPTH ?= 14
+MIN_LEAF ?= 25
+MAX_FEATURES ?= log2
+MAX_SAMPLES ?= 0.3
+TOP_STOPS ?= 300
+
+help:
+	@echo "make venv            # create virtualenv (.venv)"
+	@echo "make install         # install requirements_RF.txt"
+	@echo "make cache           # rebuild processed cache"
+	@echo "make train           # train RF (uses cache if fresh)"
+	@echo "make test            # placeholder smoke test"
+	@echo "make clean           # remove cache and artifacts (except venv)"
+
+venv:
+	$(PYTHON) -m venv .venv
+	@echo "Activate with: source .venv/bin/activate"
+
+install: venv
+	. .venv/bin/activate && pip install -r requirements_RF.txt
+
+cache:
+	. .venv/bin/activate && $(PYTHON) train_rf_bus.py --csv $(CSV) --out_dir $(OUT) --rebuild_cache
+
+train:
+	. .venv/bin/activate && $(PYTHON) train_rf_bus.py --csv $(CSV) --out_dir $(OUT) --n_estimators $(N_ESTIMATORS) --max_depth $(MAX_DEPTH) --min_samples_leaf $(MIN_LEAF) --max_features $(MAX_FEATURES) --max_samples $(MAX_SAMPLES) --top_stops $(TOP_STOPS)
+
+# Simple smoke test: ensure training_summary.json exists after a dry run
+test:
+	@test -f $(OUT)/training_summary.json && echo "Found training_summary.json" || (echo "Run 'make train' first"; exit 1)
+
+clean:
+	rm -rf $(OUT)/cache
+	rm -f $(OUT)/metrics.txt $(OUT)/confusion_matrix.png $(OUT)/feature_importance.csv $(OUT)/model.joblib $(OUT)/training_summary.json

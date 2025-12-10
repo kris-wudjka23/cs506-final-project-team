@@ -2,21 +2,16 @@
 """
 train_rf_bus.py — Binary Random Forest trainer (delayed vs not_delayed) with processed-data caching.
 
-New:
-- Processed DataFrame cache to avoid re-reading and re-processing the big CSV each run.
-- Cache lives at <out_dir>/cache/processed.parquet (or .pkl fallback).
-- Use --rebuild_cache to force a refresh.
+What it does:
+- Builds a cached, preprocessed Parquet from the raw CSV (use --rebuild_cache to refresh).
+- Drops invalid delay rows, computes calendar features, and uses target encoding (route_id, stop_id) + ordinal encoding for other cats.
+- Temporal split: train (2023-01 to 2023-09), val (2023-10 to 2023-12), test (2024).
+- Stage 1: fit on train, evaluate on val. Stage 2: fit on train+val, evaluate on test.
+- Saves metrics, confusion matrices, feature importances, model.joblib, and training_summary.json.
 
-Speed flags:
---max_features {sqrt,log2,auto} or a number
---max_samples (0<frac<=1) to subsample rows per tree (0 or omit = use all rows)
-
-Includes:
-- Safe dtype handling for mixed string/int categoricals
-- OrdinalEncoder for fast encoding
-- Fixed class weights (numpy ndarray) to avoid warnings/errors
-- Progress bar for test prediction
-- ROC-AUC and PR-AUC metrics
+Speed controls:
+- --max_features {sqrt,log2,auto} or a number
+- --max_samples (0<frac<=1) to subsample rows per tree (default 0.3 to save memory)
 
 run: python train_rf_bus.py --csv mbta_bus.csv --out_dir artifacts
 """
@@ -38,6 +33,7 @@ import matplotlib.pyplot as plt
 from joblib import dump, load, dump as joblib_dump, load as joblib_load
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OrdinalEncoder
+from category_encoders import TargetEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.utils.class_weight import compute_class_weight
@@ -201,6 +197,16 @@ def load_or_build_processed_df(csv_path: Path, out_dir: Path, tol_sec: float, re
                 "weather_condition": "string"},
     )
 
+    # Drop rows with missing/invalid delay_seconds to avoid label noise
+    df["delay_seconds"] = pd.to_numeric(df.get("delay_seconds"), errors="coerce")
+    mask_valid_delay = df["delay_seconds"].between(-7200, 7200)
+    n_before = len(df)
+    df = df[mask_valid_delay].copy()
+    n_after = len(df)
+    if n_after < n_before:
+        print(f"Filtered out {n_before - n_after} rows with missing/invalid delay_seconds.")
+    df.attrs["filtered_invalid_delay"] = int(n_before - n_after)
+
     # Calendar features
     df = enrich_calendar(df)
 
@@ -212,6 +218,17 @@ def load_or_build_processed_df(csv_path: Path, out_dir: Path, tol_sec: float, re
     pr = df["precip_mm"].fillna(0)
     df["rainy_rush_hour"] = ((pr > 0.2) & (hr.between(7, 9) | hr.between(16, 18))).astype("Int64")
 
+    # Delay filtering/clipping
+    df["delay_seconds"] = pd.to_numeric(df.get("delay_seconds"), errors="coerce")
+    mask_valid_delay = df["delay_seconds"].between(-7200, 7200)
+    n_before = len(df)
+    df = df[mask_valid_delay].copy()
+    n_after = len(df)
+    if n_after < n_before:
+        print(f"Filtered out {n_before - n_after} rows with missing/invalid delay_seconds.")
+    df.attrs["filtered_invalid_delay"] = int(n_before - n_after)
+    df["delay_sec_clipped"] = df["delay_seconds"].clip(-7200, 7200)
+
     # Numeric coercion for training columns (keeps NaNs for median impute later)
     num_cols = ["hour","weekday","is_weekend","time_point_order",
                 "air_temp_c","rel_humidity_pct","precip_mm",
@@ -219,7 +236,7 @@ def load_or_build_processed_df(csv_path: Path, out_dir: Path, tol_sec: float, re
                 "month", "day_of_year", "is_holiday", "is_school_in_session", 
                 "rainy_rush_hour"]
     for c in num_cols:
-        df[c] = pd.to_numeric(df.get(c), errors="coerce")
+        df[c] = pd.to_numeric(df.get(c), errors="coerce").astype("float32")
 
     # Labels
     df["label_mc"] = make_multiclass_label(df, tol_sec).astype("string")
@@ -250,7 +267,7 @@ def main():
     ap.add_argument("--random_state", type=int, default=42)
     ap.add_argument("--top_stops", type=int, default=300)
     ap.add_argument("--max_features", default="log2")
-    ap.add_argument("--max_samples", type=float, default=0.0)
+    ap.add_argument("--max_samples", type=float, default=0.3)
     ap.add_argument("--test_batch", type=int, default=20000)
     ap.add_argument("--rebuild_cache", action="store_true",
                     help="Force rebuilding the processed-data cache even if up-to-date.")
@@ -272,37 +289,64 @@ def main():
                 "month", "day_of_year", "is_holiday", "is_school_in_session", 
                 "rainy_rush_hour"]
 
-    # Date-based split
-    train = df[(df["service_date"] >= "2023-01-01") & (df["service_date"] < "2024-01-01")].copy()
+    # Date-based split (temporal: train → val → test)
+    train = df[(df["service_date"] >= "2023-01-01") & (df["service_date"] < "2023-10-01")].copy()
+    val   = df[(df["service_date"] >= "2023-10-01") & (df["service_date"] < "2024-01-01")].copy()
     test  = df[(df["service_date"] >= "2024-01-01") & (df["service_date"] < "2025-01-01")].copy()
 
-    # Reduce stop_id cardinality if requested (depends on training distribution → done after caching)
-    if args.top_stops and args.top_stops > 0:
-        top_stops = train["stop_id"].value_counts().nlargest(args.top_stops).index
-        train.loc[~train["stop_id"].isin(top_stops), "stop_id"] = "other"
-        test.loc[~test["stop_id"].isin(top_stops), "stop_id"] = "other"
+    # Keep pristine copies for re-imputation and final train+val fit
+    train_raw, val_raw, test_raw = train.copy(), val.copy(), test.copy()
 
-    cat = ["route_id","direction_id","stop_id","point_type","weather_condition","season"]
+    cat_target = ["route_id","stop_id"]
+    cat_other = ["direction_id","point_type","weather_condition","season"]
+    cat_all = cat_target + cat_other
+    cat = cat_all
 
-    for c in cat:
-        train[c] = train[c].astype("string").fillna("<missing>")
-        test[c]  = test[c].astype("string").fillna("<missing>")
-    for c in num_cols:
-        med = pd.to_numeric(train[c], errors="coerce").median()
-        train[c] = pd.to_numeric(train[c], errors="coerce").fillna(med)
-        test[c]  = pd.to_numeric(test[c], errors="coerce").fillna(med)
+    def apply_top_stops(base_train: pd.DataFrame, others: list[pd.DataFrame], top_n: int):
+        if not top_n or top_n <= 0:
+            return base_train, others, None
+        top = base_train["stop_id"].value_counts().nlargest(top_n).index
+        base_train.loc[~base_train["stop_id"].isin(top), "stop_id"] = "other"
+        for odf in others:
+            odf.loc[~odf["stop_id"].isin(top), "stop_id"] = "other"
+        return base_train, others, top
 
-    pre = ColumnTransformer([
-        ("cat", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1, encoded_missing_value=-2), cat),
-        ("num", "passthrough", num_cols)
-    ])
+    def fill_cats_and_nums(train_df: pd.DataFrame, other_dfs: list[pd.DataFrame]):
+        for c in cat_all:
+            train_df[c] = train_df[c].astype("string").fillna("<missing>")
+            for odf in other_dfs:
+                odf[c] = odf[c].astype("string").fillna("<missing>")
+        for c in num_cols:
+            med = pd.to_numeric(train_df[c], errors="coerce").median()
+            train_df[c] = pd.to_numeric(train_df[c], errors="coerce").fillna(med)
+            for odf in other_dfs:
+                odf[c] = pd.to_numeric(odf[c], errors="coerce").fillna(med)
+        return train_df, other_dfs
+
+    def build_preprocessor():
+        return ColumnTransformer([
+            ("target", TargetEncoder(cols=cat_target), cat_target),
+            ("cat", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1, encoded_missing_value=-2), cat_other),
+            ("num", "passthrough", num_cols)
+        ])
 
     classes_arr = np.array([0, 1], dtype=int)
-    y_train_arr = np.asarray(train["label"], dtype=int)
-    cw = compute_class_weight(class_weight="balanced", classes=classes_arr, y=y_train_arr)
-    class_weight = {int(k): float(v) for k, v in zip(classes_arr, cw)}
 
-    rf = RandomForestClassifier(
+    metrics_txt_blocks = []
+    metrics_summary = {}
+
+    # ---- Stage 1: train-only fit, evaluate on validation ----
+    train_stage1 = train_raw.copy()
+    val_stage1 = val_raw.copy()
+    train_stage1, [val_stage1], _ = apply_top_stops(train_stage1, [val_stage1], args.top_stops)
+    train_stage1, [val_stage1] = fill_cats_and_nums(train_stage1, [val_stage1])
+
+    y_train_stage1 = np.asarray(train_stage1["label"], dtype=int)
+    cw1 = compute_class_weight(class_weight="balanced", classes=classes_arr, y=y_train_stage1)
+    class_weight = {int(k): float(v) for k, v in zip(classes_arr, cw1)}
+
+    pre_stage1 = build_preprocessor()
+    rf_stage1 = RandomForestClassifier(
         n_estimators=args.n_estimators,
         max_depth=args.max_depth,
         min_samples_leaf=args.min_samples_leaf,
@@ -312,37 +356,97 @@ def main():
         n_jobs=-1,
         random_state=args.random_state,
     )
-    pipe = Pipeline([("pre", pre), ("rf", rf)])
+    pipe = Pipeline([("pre", pre_stage1), ("rf", rf_stage1)])
 
-    # Fit
     t0 = time.time()
-    pipe.fit(train[cat+num_cols], y_train_arr)
-    print(f"[done] Fit completed in {(time.time()-t0)/60:.1f} min")
+    pipe.fit(train_stage1[cat+num_cols], y_train_stage1)
+    fit_minutes_stage1 = round((time.time()-t0)/60, 2)
+    print(f"[done] Stage1 fit (train only) completed in {fit_minutes_stage1:.1f} min")
 
-    # Evaluate
-    pre_fitted = pipe.named_steps["pre"]
-    rf_fitted = pipe.named_steps["rf"]
-    y_pred, y_prob = predict_with_progress(pre_fitted, rf_fitted, test[cat+num_cols], args.test_batch)
+    if len(val_stage1):
+        pre_fitted = pipe.named_steps["pre"]
+        rf_fitted = pipe.named_steps["rf"]
+        X_val = val_stage1[cat + num_cols]
+        y_val_true = np.asarray(val_stage1["label"], dtype=int)
+        y_val_pred, y_val_prob = predict_with_progress(pre_fitted, rf_fitted, X_val, args.test_batch)
+        cm_val = confusion_matrix(y_val_true, y_val_pred, labels=[0, 1])
+        report_val = classification_report(y_val_true, y_val_pred, target_names=["not_delayed", "delayed"], digits=4)
+        roc_val, aupr_val = roc_auc_score(y_val_true, y_val_prob), average_precision_score(y_val_true, y_val_prob)
 
-    y_true = np.asarray(test["label"], dtype=int)
-    cm = confusion_matrix(y_true, y_pred, labels=[0,1])
-    report = classification_report(y_true, y_pred, target_names=["not_delayed","delayed"], digits=4)
-    roc, aupr = roc_auc_score(y_true, y_prob), average_precision_score(y_true, y_prob)
+        metrics_txt_blocks.append(
+            f"=== VALIDATION (train-only model) ===\n{report_val}ROC-AUC: {roc_val:.4f}\nPR-AUC: {aupr_val:.4f}\n"
+        )
+        confusion_matrix_figure(cm_val, ["not_delayed", "delayed"], out_dir / "confusion_matrix_val.png", "Confusion Matrix (Validation)")
+        metrics_summary["validation"] = {"roc_auc": float(roc_val), "pr_auc": float(aupr_val)}
+    else:
+        metrics_txt_blocks.append("=== VALIDATION (train-only model) ===\n(no rows)\n")
+        metrics_summary["validation"] = {"roc_auc": None, "pr_auc": None}
 
-    # Save
-    (out_dir / "metrics.txt").write_text(report + f"ROC-AUC: {roc:.4f}\nPR-AUC: {aupr:.4f}\n", encoding="utf-8")
-    confusion_matrix_figure(cm, ["not_delayed","delayed"], out_dir / "confusion_matrix.png", "Confusion Matrix (Binary)")
+    # ---- Stage 2: retrain on train+val, evaluate on test ----
+    train_val_final = pd.concat([train_raw, val_raw], axis=0, ignore_index=True)
+    test_final = test_raw.copy()
+    train_val_final, [test_final], _ = apply_top_stops(train_val_final, [test_final], args.top_stops)
+    train_val_final, [test_final] = fill_cats_and_nums(train_val_final, [test_final])
 
-    fi = pd.DataFrame({"feature": cat+num_cols, "importance": rf_fitted.feature_importances_}).sort_values("importance", ascending=False)
+    y_train_final = np.asarray(train_val_final["label"], dtype=int)
+    cw2 = compute_class_weight(class_weight="balanced", classes=classes_arr, y=y_train_final)
+    class_weight_final = {int(k): float(v) for k, v in zip(classes_arr, cw2)}
+
+    pre_final = build_preprocessor()
+    rf_final = RandomForestClassifier(
+        n_estimators=args.n_estimators,
+        max_depth=args.max_depth,
+        min_samples_leaf=args.min_samples_leaf,
+        max_features=max_features,
+        max_samples=max_samples,
+        class_weight=class_weight_final,
+        n_jobs=-1,
+        random_state=args.random_state,
+    )
+    pipe_final = Pipeline([("pre", pre_final), ("rf", rf_final)])
+
+    t1 = time.time()
+    pipe_final.fit(train_val_final[cat+num_cols], y_train_final)
+    fit_minutes_stage2 = round((time.time()-t1)/60, 2)
+    print(f"[done] Stage2 fit (train+val) completed in {fit_minutes_stage2:.1f} min")
+
+    pre_fitted_f = pipe_final.named_steps["pre"]
+    rf_fitted_f = pipe_final.named_steps["rf"]
+    if len(test_final):
+        X_test = test_final[cat + num_cols]
+        y_test_true = np.asarray(test_final["label"], dtype=int)
+        y_test_pred, y_test_prob = predict_with_progress(pre_fitted_f, rf_fitted_f, X_test, args.test_batch)
+        cm_test = confusion_matrix(y_test_true, y_test_pred, labels=[0, 1])
+        report_test = classification_report(y_test_true, y_test_pred, target_names=["not_delayed", "delayed"], digits=4)
+        roc_test, aupr_test = roc_auc_score(y_test_true, y_test_prob), average_precision_score(y_test_true, y_test_prob)
+        metrics_txt_blocks.append(
+            f"=== TEST (final model: train+val) ===\n{report_test}ROC-AUC: {roc_test:.4f}\nPR-AUC: {aupr_test:.4f}\n"
+        )
+        confusion_matrix_figure(cm_test, ["not_delayed", "delayed"], out_dir / "confusion_matrix.png", "Confusion Matrix (Test)")
+        metrics_summary["test"] = {"roc_auc": float(roc_test), "pr_auc": float(aupr_test)}
+    else:
+        metrics_txt_blocks.append("=== TEST (final model: train+val) ===\n(no rows)\n")
+        metrics_summary["test"] = {"roc_auc": None, "pr_auc": None}
+
+    # Save metrics text
+    (out_dir / "metrics.txt").write_text("\n".join(metrics_txt_blocks), encoding="utf-8")
+
+    feature_names = cat_target + cat_other + num_cols
+    fi = pd.DataFrame({"feature": feature_names, "importance": rf_fitted_f.feature_importances_}).sort_values("importance", ascending=False)
     fi.to_csv(out_dir / "feature_importance.csv", index=False)
-    dump(pipe, out_dir / "model.joblib")
+    dump(pipe_final, out_dir / "model.joblib")
 
     summary = {
         "rows_total": int(len(df)),
-        "rows_train": int(len(train)),
-        "rows_test": int(len(test)),
-        "class_balance_train_binary": train["label"].value_counts(normalize=True).to_dict(),
-        "class_balance_test_binary":  test["label"].value_counts(normalize=True).to_dict(),
+        "rows_train": int(len(train_raw)),
+        "rows_val": int(len(val_raw)),
+        "rows_train_val": int(len(train_val_final)),
+        "rows_test": int(len(test_raw)),
+        "rows_filtered_invalid_delay": int(df.attrs.get("filtered_invalid_delay", 0)),
+        "class_balance_train_binary": train_raw["label"].value_counts(normalize=True).to_dict(),
+        "class_balance_val_binary":   val_raw["label"].value_counts(normalize=True).to_dict(),
+        "class_balance_train_val_binary": train_val_final["label"].value_counts(normalize=True).to_dict(),
+        "class_balance_test_binary":  test_raw["label"].value_counts(normalize=True).to_dict(),
         "params": {
             "tol_sec": args.tol_sec,
             "n_estimators": args.n_estimators,
@@ -354,9 +458,10 @@ def main():
             "max_features": args.max_features,
             "max_samples": None if max_samples is None else float(max_samples) if isinstance(max_samples, float) else int(max_samples),
         },
-        "encoder": "OrdinalEncoder",
-        "fit_minutes": round((time.time()-t0)/60, 2),
-        "metrics": {"roc_auc": float(roc), "pr_auc": float(aupr)},
+        "encoder": "TargetEncoder(route_id, stop_id) + OrdinalEncoder(others)",
+        "fit_minutes_stage1": fit_minutes_stage1,
+        "fit_minutes_stage2": fit_minutes_stage2,
+        "metrics": metrics_summary,
         "cache": {
             "used": True,
             "path": str((out_dir / "cache").resolve()),
@@ -365,9 +470,8 @@ def main():
     }
     (out_dir / "training_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
-    print("=== Binary Classification Report (2024 test) ===")
-    print(report)
-    print(f"ROC-AUC: {roc:.4f}  |  PR-AUC: {aupr:.4f}")
+    print("=== Validation metrics (train-only model) written to metrics.txt ===")
+    print("=== Test metrics (final model) written to metrics.txt ===")
     print(f"Artifacts saved to: {out_dir.resolve()}")
 
 
