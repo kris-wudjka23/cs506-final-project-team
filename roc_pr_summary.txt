@@ -1,0 +1,30 @@
+=== Metrics (from metrics.txt) ===
+=== VALIDATION (train-only model) ===
+              precision    recall  f1-score   support
+
+ not_delayed     0.7946    0.6082    0.6890   3765042
+     delayed     0.4963    0.7105    0.5844   2045147
+
+    accuracy                         0.6442   5810189
+   macro avg     0.6454    0.6594    0.6367   5810189
+weighted avg     0.6896    0.6442    0.6522   5810189
+ROC-AUC: 0.7228
+PR-AUC: 0.5870
+
+=== TEST (final model: train+val) ===
+              precision    recall  f1-score   support
+
+ not_delayed     0.7526    0.6431    0.6935  15313112
+     delayed     0.4693    0.5988    0.5262   8071242
+
+    accuracy                         0.6278  23384354
+   macro avg     0.6109    0.6210    0.6099  23384354
+weighted avg     0.6548    0.6278    0.6358  23384354
+ROC-AUC: 0.6668
+PR-AUC: 0.4857
+
+=== Summary JSON ===
+Validation ROC-AUC: 0.7228204610223691
+Validation PR-AUC:  0.5870198706959822
+Test ROC-AUC:       0.6667697580263959
+Test PR-AUC:        0.48572362254017154
