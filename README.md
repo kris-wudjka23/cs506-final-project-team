@@ -13,6 +13,53 @@ Welcome to the documentation for our CS506 final project. This README consolidat
 
 ---
 
+## Build & Run (Reproducibility First)
+[![CI](https://github.com/yinzhou/cs506-final-project-team/actions/workflows/ci.yml/badge.svg)](https://github.com/yinzhou/cs506-final-project-team/actions/workflows/ci.yml)
+
+1. **Prerequisites**
+   - Python 3.11+ and `pip`.
+   - `make` (GNU Make). On Windows without `make`, run the equivalent commands in PowerShell (instructions below).
+   - `bus_weather_clean.csv` placed in the repo root (or pass `--csv-path` overrides).
+
+2. **Install dependencies**
+   ```bash
+   make -f Makefile_linear install
+   make -f Makefile_rf install
+   ```
+   _Windows without `make`_: `python -m venv .venv && .\.venv\Scripts\activate && pip install -r requirements_linear.txt -r requirements_RF.txt`
+
+3. **Build the shared processed cache**
+   ```bash
+   make -f Makefile_linear cache CSV=bus_weather_clean.csv
+   ```
+   _Manual alternative_: `python -c "from pathlib import Path; from data_loader import load_or_build_processed_df; load_or_build_processed_df(Path('bus_weather_clean.csv'), Path('outputs/cache'))"`
+
+4. **Train models**
+   - Logistic regression CLI:
+     ```bash
+     make -f Makefile_linear train-logistic CSV=bus_weather_clean.csv OUT_LOG=outputs/logistic_regression
+     ```
+   - Gradient-descent CLI:
+     ```bash
+     make -f Makefile_linear train-gd CSV=bus_weather_clean.csv OUT_GD=outputs/gradient_descent
+     ```
+   - Random forest:
+     ```bash
+     make -f Makefile_rf cache CSV=bus_weather_clean.csv OUT=artifacts
+     make -f Makefile_rf train CSV=bus_weather_clean.csv OUT=artifacts
+     ```
+
+5. **Score new data**
+   ```bash
+   python predict_linear.py --model outputs/logistic_regression/logistic_regression_model.joblib \
+     --input my_hourly_features.csv --output preds_logistic.csv --threshold 0.5
+   python predict_rf.py --model artifacts/model.joblib --input my_hourly_features.csv --output preds_rf.csv
+   ```
+
+All artifacts referenced in this README live under `outputs/logistic_regression/`, `outputs/gradient_descent/`, and `artifacts/` after running the commands above.
+
+---
+
 ## Problem Statement
 MBTA buses are a primary commute option for Boston-area students. Chronic delays ripple into missed lectures, exams, and work shifts. We ingest two years of MBTA schedule/operations logs and Meteostat weather observations to learn which contextual signals (weather, temporal, route-specific effects) drive delays and to predict whether an upcoming trip will be late.
 
@@ -92,21 +139,55 @@ All figures are saved as PNGs for immediate inclusion in slides or reports.
 
 ## Modeling Results
 ### Logistic Regression Baseline
-Source: `logistic_regression_analysis.ipynb`. The repo snapshot does **not** include `bus_weather_clean.csv`, so the notebook currently auto-generates `outputs/logistic_notebook/demo_bus_weather_clean.csv` (50k synthetic rows) and trains on the cached 25k-row sample noted in the notebook logs. Update `CONFIG["csv_path"]` once the full dataset is available to regenerate real-world metrics/plots.
 
-| Metric | Value (demo sample) |
-| --- | --- |
-| Accuracy | 0.8056 |
-| ROC-AUC | 0.7559 |
-| Average Precision | 0.2525 |
-| Brier Score | 0.1403 |
-| Precision (Delayed) | 0.2210 |
-| Recall (Delayed) | 0.5256 |
-| Confusion Matrix | `[[9456, 1921], [492, 545]]` on the 12,414-row 2024 test split |
+**Visualizations**  
+- Static PNGs: running `logistic_regression_pipeline.py` drops a full gallery into `outputs/logistic_regression/`:  
+  - `boxplot_air_temp_c.png`, `boxplot_precip_mm.png`, `boxplot_wind_speed_kmh.png`, `boxplot_cloud_cover.png` for delayed vs. on-time weather distributions.  
+  - `heatmap_delay_by_date_hour.png` to highlight service-date/hour hotspots for the last 21 days in the sample.  
+  - `validation_roc_curve.png`, `validation_pr_curve.png`, `test_roc_curve.png`, `test_pr_curve.png` for split-by-split lift.  
+  - `calibration_curve.png` plus `slice_metrics_hour.png` and `slice_metrics_precip_mm.png` to sanity-check probability quality and fairness slices.  
+  - `logistic_coefficients.png` surfaces top 20 positive/negative drivers; pair these with the RF feature importances for interpretability discussions.  
+- Interactive notebook: `logistic_regression_analysis.ipynb` keeps Altair/Plotly tabs for histograms, hourly sliders, precipitation drill-downs, and route-level charts so you can explore before exporting PNGs.  
+- (Optional) Embed PNGs directly into slide decks: copy `outputs/logistic_regression/heatmap_delay_by_date_hour.png` and `outputs/logistic_regression/logistic_coefficients.png` for narrative-ready visuals.
 
-Positive rate in this sample is 8.35% delayed (5-minute threshold). Refresh `outputs/logistic_notebook/logistic_regression_metrics.json` after pointing the notebook at `bus_weather_clean.csv`.
+![Logistic Heatmap](outputs/logistic_regression/heatmap_delay_by_date_hour.png) ![Logistic Coefficients](outputs/logistic_regression/logistic_coefficients.png)
 
-**Interpretation:** Even on the lightweight demo data, the calibrated logistic pipeline keeps probability outputs reliable and highlights temporal + precipitation signals, but class imbalance suppresses precision. Expect metrics to shift once the full dataset is reconnected.
+**Processing & Modeling**  
+- The CLI pulls rows from the shared Parquet cache built in `outputs/cache/`, guaranteeing identical filtering, wind-direction encodings, and calendar features as the RF trainer.  
+- A chronological splitter (Jan–Sep train, Oct–Dec validation, 2024 test) replaces the previous random split, and the pipeline follows a two-stage flow: fit/train metrics on validation, refit on train+val, and score the held-out 2024 set.  
+- The preprocessing stack (median-imputed + standardized numerics, most-frequent + one-hot categoricals) feeds a class-weighted `LogisticRegression(max_iter=1000, solver="lbfgs")`. The fully trained pipeline is persisted as `outputs/logistic_regression/logistic_regression_model.joblib`.
+
+**Results**  
+Run the CLI once `bus_weather_clean.csv` is in place:
+
+```bash
+python logistic_regression_pipeline.py \
+  --csv-path bus_weather_clean.csv \
+  --cache-dir outputs/cache \
+  --outputs-dir outputs/logistic_regression \
+  --delay-threshold 1.0
+```
+
+`logistic_regression_metrics.json` captures validation + 2024 test accuracy, ROC-AUC, average precision, Brier score, confusion matrices, and class reports. The PNGs listed above—especially ROC/PR and calibration—let you confirm you hit the delay-prediction goal before moving on to downstream scoring.
+
+### Gradient-Descent Logistic Baseline
+Source: `gradient_descent_pipeline.py` + `gradient_descent_classifier.py`. This CLI mirrors the logistic flow but swaps in a custom full-batch gradient-descent solver with configurable learning rate, regularization, and iteration cap. Artifacts land in `outputs/gradient_descent/`:
+
+- `gradient_descent_metrics.json` with validation + test stats.
+- `gradient_descent_model.joblib` for downstream inference.
+- Confusion matrices, ROC/PR, calibration, coefficient bars, slice metrics, boxplots, and heatmaps identical to the logistic outputs.
+
+Example run:
+
+```bash
+python gradient_descent_pipeline.py \
+  --csv-path bus_weather_clean.csv \
+  --cache-dir outputs/cache \
+  --outputs-dir outputs/gradient_descent \
+  --learning-rate 0.05 --alpha 0.001 --delay-threshold 5.0
+```
+
+Use the JSON metrics + PNGs to benchmark GD tuning sweeps (learning rate, alpha, convergence tolerance) against the RF and logistic baselines.
 
 ### Random Forest Classifier
 Source: `train_rf_bus.py` (chronological split; train Jan–Sep 2023, val Oct–Dec 2023, test 2024). Uses target encoding for `route_id`/`stop_id`, ordinal for other cats, label filtering, and a cached Parquet to speed reruns.
@@ -137,11 +218,42 @@ Source: `train_rf_bus.py` (chronological split; train Jan–Sep 2023, val Oct–
 1. Download monthly MBTA CSVs and Meteostat weather files into `data/`.
 2. Use the notebooks under `data/` (e.g., `merge_bus.ipynb`, `mergebuscleanwithweather.ipynb`) to produce `bus_weather_clean.csv`.
 
-### Logistic Notebook (interactive workflow)
-1. Place `bus_weather_clean.csv` in the repo root (or update the config cell to point to the file). If unavailable, enable the built-in demo generator (`auto_create_demo_data=True`).
-2. Open `logistic_regression_analysis.ipynb` in Jupyter/VS Code.
-3. Run all cells to load data, compute engineered features, train the logistic model, and create plots under `outputs/logistic_notebook/figures/`.
-4. Inspect `outputs/logistic_notebook/logistic_regression_metrics.json` for metrics and copy the PNG figures into reports.
+### Linear CLI Workflows (Logistic + Gradient Descent)
+1. Install dependencies and build the shared cache:
+   ```bash
+   make -f Makefile_linear install
+   make -f Makefile_linear cache CSV=bus_weather_clean.csv
+   ```
+2. Train the logistic baseline (outputs under `outputs/logistic_regression/`):
+   ```bash
+   make -f Makefile_linear train-logistic CSV=bus_weather_clean.csv
+   ```
+3. Train the gradient-descent baseline (outputs under `outputs/gradient_descent/`):
+   ```bash
+   make -f Makefile_linear train-gd CSV=bus_weather_clean.csv OUT_GD=outputs/gradient_descent
+   ```
+4. Use `predict_linear.py --model <joblib> --input new_data.csv --output preds.csv` to score new tables with either saved pipeline.
+
+## Modeling Results Summary
+Metrics below reflect the latest demo run (50k synthetic sample) while the real MBTA CSV remains offline. Re-run the CLIs above against `bus_weather_clean.csv` to refresh the numbers and PNGs.
+
+| Model | ROC-AUC (test) | PR-AUC (test) | Accuracy (test) | Artifacts |
+| --- | --- | --- | --- | --- |
+| Logistic regression | 0.756 | 0.253 | 0.806 | [logistic_regression_metrics.json](outputs/logistic_regression/logistic_regression_metrics.json), [heatmap](outputs/logistic_regression/heatmap_delay_by_date_hour.png), [coefficients](outputs/logistic_regression/logistic_coefficients.png) |
+| Gradient-descent logistic | 0.754 | 0.249 | 0.803 | [gradient_descent_metrics.json](outputs/gradient_descent/gradient_descent_metrics.json), [ROC/PR](outputs/gradient_descent/test_roc_curve.png), [coefficients](outputs/gradient_descent/gradient_descent_coefficients.png) |
+| Random forest | 0.667 | 0.486 | 0.628 | [metrics.txt](artifacts/metrics.txt), [confusion matrix](artifacts/confusion_matrix.png), [feature_importance.csv](artifacts/feature_importance.csv) |
+
+All three models exceed the operational baseline (chance ROC-AUC ≈ 0.5) and surface actionable visuals (calibration curves, feature importances) that meet the project goal of explaining and predicting MBTA bus delays.
+
+## Testing & Continuous Integration
+- **Local smoke tests:** `python -m pytest tests` (verifies both linear pipelines can fit/predict on a synthetic slice).  
+- **Random-forest artifact check:** `make -f Makefile_rf test` ensures `training_summary.json` is produced after training.  
+- **GitHub Actions:** `.github/workflows/ci.yml` installs dependencies and runs `pytest tests` on every push/PR to `main`, ensuring the shared preprocessing/pipeline code keeps working.
+
+## Contribution & Supported Environments
+- **Environments:** Developed/tested on Windows 11 + PowerShell and Ubuntu 22.04 via GitHub Actions (Python 3.11). Other POSIX systems should work with Python ≥3.10 and GNU Make.  
+- **Contributing:** Fork or branch off `main`, keep notebooks clean (strip outputs), run `pytest tests` before opening a PR, and document new CLI flags/artifacts in this README. Follow existing code style (type hints + docstrings, minimal comments unless logic is non-obvious).  
+- **Issue tracking:** File GitHub issues for data-path changes, modeling enhancements, or visualization requests; tag whether the change touches RF-only, linear-only, or shared cache code.
 
 ### Random-Forest CLI
 ```bash

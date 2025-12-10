@@ -1,0 +1,30 @@
+.DEFAULT_GOAL := help
+
+PYTHON ?= python3
+CSV ?= bus_weather_clean.csv
+CACHE_DIR ?= outputs/cache
+OUT_LOG ?= outputs/logistic_regression
+OUT_GD ?= outputs/gradient_descent
+
+help:
+	@echo "make venv              # create virtualenv (.venv)"
+	@echo "make install           # install requirements for linear baselines"
+	@echo "make cache             # build or refresh the processed cache"
+	@echo "make train-logistic    # run logistic_regression_pipeline.py"
+	@echo "make train-gd          # run gradient_descent_pipeline.py"
+
+venv:
+	$(PYTHON) -m venv .venv
+	@echo "Activate with: source .venv/bin/activate"
+
+install: venv
+	. .venv/bin/activate && pip install -r requirements_linear.txt
+
+cache:
+	. .venv/bin/activate && $(PYTHON) -c "from pathlib import Path; from data_loader import load_or_build_processed_df; load_or_build_processed_df(Path('$(CSV)'), Path('$(CACHE_DIR)'));"
+
+train-logistic:
+	. .venv/bin/activate && $(PYTHON) logistic_regression_pipeline.py --csv-path $(CSV) --cache-dir $(CACHE_DIR) --outputs-dir $(OUT_LOG)
+
+train-gd:
+	. .venv/bin/activate && $(PYTHON) gradient_descent_pipeline.py --csv-path $(CSV) --cache-dir $(CACHE_DIR) --outputs-dir $(OUT_GD)
