@@ -14,7 +14,6 @@ Welcome to the documentation for our CS506 final project. This README consolidat
 ---
 
 ## Build & Run (Reproducibility First)
-[![CI](https://github.com/kris-wudjka23/cs506-final-project-team/actions/workflows/ci.yml/badge.svg)](https://github.com/kris-wudjka23/cs506-final-project-team/actions/workflows/ci.yml)
 
 1. **Prerequisites**
    - Python 3.11+ and `pip`.
