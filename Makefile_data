@@ -1,0 +1,72 @@
+# Makefile_data
+# Data pipeline for merge_bus.py + mergebuscleanwithweather.py + tests
+
+.DEFAULT_GOAL := help
+
+PYTHON ?= python3
+VENV   ?= .venv
+
+# ---------- paths ----------
+DATA_DIR       := data
+RAW_DIR        := $(DATA_DIR)/rawdata
+PROCESSED_DIR  := $(DATA_DIR)/processdata
+
+BUS_2023_DIR   := $(RAW_DIR)/MBTA_Bus_Arrival_Departure_Times_2023
+BUS_2024_DIR   := $(RAW_DIR)/MBTA_Bus_Arrival_Departure_Times_2024
+
+WEATHER_2023   := $(RAW_DIR)/2023bostonweather.csv
+WEATHER_2024   := $(RAW_DIR)/2024bostonweather.csv
+
+BUS_CLEAN      := $(PROCESSED_DIR)/bus_clean.csv
+BUS_WEATHER    := $(PROCESSED_DIR)/bus_weather_clean.csv
+
+TESTS          := tests/test_merge_bus.py tests/test_mergebuscleanwithweather.py
+
+# ---------- phony ----------
+.PHONY: help venv install data bus_clean bus_weather test clean
+
+help:
+	@echo "make venv        # create virtualenv ($(VENV))"
+	@echo "make install     # install requirements_data.txt into venv"
+	@echo "make bus_clean   # build $(BUS_CLEAN) from raw MBTA bus CSVs"
+	@echo "make bus_weather # merge bus_clean with weather -> $(BUS_WEATHER)"
+	@echo "make data        # run full data pipeline (bus_clean + bus_weather)"
+	@echo "make test        # run pytest for data pipeline modules"
+	@echo "make clean       # remove processed CSVs (keeps raw data and venv)"
+
+venv:
+	$(PYTHON) -m venv $(VENV)
+	@echo "Activate with: source $(VENV)/bin/activate"
+
+install: venv
+	. $(VENV)/bin/activate && pip install -r requirements_data.txt
+
+# ---------- concrete targets ----------
+
+$(PROCESSED_DIR):
+	mkdir -p $(PROCESSED_DIR)
+
+bus_clean: $(BUS_CLEAN)
+
+$(BUS_CLEAN): data/merge_bus.py | $(PROCESSED_DIR)
+	. $(VENV)/bin/activate && $(PYTHON) data/merge_bus.py \
+		--path_2023 $(BUS_2023_DIR) \
+		--path_2024 $(BUS_2024_DIR) \
+		--output $(BUS_CLEAN)
+
+bus_weather: $(BUS_WEATHER)
+
+$(BUS_WEATHER): data/mergebuscleanwithweather.py $(BUS_CLEAN) | $(PROCESSED_DIR)
+	. $(VENV)/bin/activate && $(PYTHON) data/mergebuscleanwithweather.py \
+		--bus-path $(BUS_CLEAN) \
+		--weather-2023 $(WEATHER_2023) \
+		--weather-2024 $(WEATHER_2024) \
+		--output-path $(BUS_WEATHER)
+
+data: bus_weather
+
+test: install
+	. $(VENV)/bin/activate && pytest $(TESTS)
+
+clean:
+	rm -f $(BUS_CLEAN) $(BUS_WEATHER)
