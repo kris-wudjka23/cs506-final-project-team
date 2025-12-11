@@ -5,7 +5,7 @@ Welcome to the documentation for our CS506 final project. This README consolidat
 ---
 
 ## Quick Links
-- **Presentation video:** [YouTube](https://www.youtube.com/watch?v=AJF210YWvrs)
+- **Presentation video:** [YouTube](https://www.youtube.com/watch?v=xA2GOnq4TFE&t=9s)
 - **Logistic notebook:** `logistic_regression_analysis.ipynb` (outputs in `outputs/logistic_notebook/`)
 - **Random-forest trainer:** `train_rf_bus.py` (artifacts in `outputs/`)
 - **Exploratory notebook:** `preliminary_feature_exploration.ipynb`
